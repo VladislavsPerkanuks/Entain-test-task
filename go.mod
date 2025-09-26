@@ -4,7 +4,9 @@ go 1.25.1
 
 require (
 	github.com/go-chi/chi/v5 v5.2.3
+	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.11.1
+	github.com/google/uuid v1.6.0
 )
 
 require (
