@@ -1,20 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	httpServer "github.com/VladislavsPerkanuks/Entain-test-task/internal/http"
 )
 
 func main() {
-	r := chi.NewRouter()
+	router := httpServer.NewRouter()
 
-	r.Use(middleware.Logger)
-
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome"))
-	})
-
-	http.ListenAndServe(":3000", r)
+	fmt.Println("Starting server on :3000...")
+	if err := http.ListenAndServe(":3000", router); err != nil {
+		fmt.Printf("Server failed to start: %v\n", err)
+	}
 }
