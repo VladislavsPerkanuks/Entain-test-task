@@ -8,7 +8,7 @@ import (
 )
 
 type User struct {
-	ID      uuid.UUID       `json:"id"`
+	ID      int             `json:"id"`
 	Balance decimal.Decimal `json:"balance"`
 }
 
@@ -29,7 +29,7 @@ const (
 
 type Transaction struct {
 	ID         uuid.UUID        `json:"id"`
-	UserID     uuid.UUID        `json:"user_id"`
+	UserID     int              `json:"user_id"`
 	State      TransactionState `json:"state"`
 	Amount     decimal.Decimal  `json:"amount"`
 	SourceType SourceType       `json:"source_type"`
@@ -38,6 +38,6 @@ type Transaction struct {
 
 type ProcessedTransaction struct {
 	TransactionID uuid.UUID `json:"transaction_id"`
-	UserID        uuid.UUID `json:"user_id"`
+	UserID        int       `json:"user_id"`
 	ProcessedAt   time.Time `json:"processed_at"`
 }

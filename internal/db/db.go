@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/VladislavsPerkanuks/Entain-test-task/internal/model"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
 type Repository interface {
-	GetBalance(userID uuid.UUID) (decimal.Decimal, error)
+	GetBalance(userID int) (decimal.Decimal, error)
 	ProcessTransaction(tx *model.Transaction) error
 }
 
@@ -22,12 +21,12 @@ func NewRepository(db *sql.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (r *RepositoryImpl) GetBalance(userID uuid.UUID) (decimal.Decimal, error) {
+func (r *RepositoryImpl) GetBalance(userID int) (decimal.Decimal, error) {
 	var balance decimal.Decimal
 
 	err := r.db.QueryRow("SELECT balance FROM users WHERE id = $1", userID).Scan(&balance)
 	if err != nil {
-		return decimal.Zero, fmt.Errorf("failed to get balance for user %s: %w", userID, err)
+		return decimal.Zero, fmt.Errorf("failed to get balance for user %d: %w", userID, err)
 	}
 
 	return balance, nil
