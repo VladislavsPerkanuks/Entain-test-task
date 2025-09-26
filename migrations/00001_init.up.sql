@@ -3,6 +3,10 @@ CREATE TABLE users (
     balance DECIMAL(20, 2) NOT NULL DEFAULT 0.00
 );
 
+ALTER TABLE users ADD CONSTRAINT users_balance_non_negative CHECK (
+    balance >= 0
+);
+
 CREATE TABLE transactions (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users (id),
