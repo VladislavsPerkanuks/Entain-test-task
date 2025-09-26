@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/VladislavsPerkanuks/Entain-test-task/internal/db"
 	"github.com/VladislavsPerkanuks/Entain-test-task/internal/model"
+	"github.com/VladislavsPerkanuks/Entain-test-task/internal/repository"
 	"github.com/shopspring/decimal"
 )
 
@@ -12,10 +12,10 @@ type TransactionService interface {
 }
 
 type TransactionServiceImpl struct {
-	repo db.Repository
+	repo repository.Repository
 }
 
-func NewTransactionService(repo db.Repository) TransactionService {
+func NewTransactionService(repo repository.Repository) TransactionService {
 	return &TransactionServiceImpl{repo: repo}
 }
 

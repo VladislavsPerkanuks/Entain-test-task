@@ -3,10 +3,13 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/VladislavsPerkanuks/Entain-test-task/internal/config"
 	httpServer "github.com/VladislavsPerkanuks/Entain-test-task/internal/http"
+	"github.com/VladislavsPerkanuks/Entain-test-task/internal/repository"
+	"github.com/VladislavsPerkanuks/Entain-test-task/internal/service"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -15,47 +18,57 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func migrateDB(conf *config.Config) {
-	db, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		conf.DB_USER, conf.DB_PASSWORD, conf.DB_HOST, conf.DB_PORT, conf.DB_NAME))
-	if err != nil {
-		panic(fmt.Sprintf("Failed to connect to the database: %v", err))
-	}
-	defer db.Close()
-
-	// Test the connection
-	if err := db.Ping(); err != nil {
-		panic(fmt.Sprintf("Failed to ping database: %v", err))
-	}
-
+func migrateDB(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create postgres driver: %v", err))
+		return fmt.Errorf("Failed to create postgres driver: %v", err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://migrations",
 		"postgres", driver)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create migrate instance: %v", err))
+		return fmt.Errorf("Failed to create migrate instance: %v", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		panic(fmt.Sprintf("Failed to run migrations: %v", err))
+		return fmt.Errorf("Failed to run migrations: %v", err)
 	}
 
-	fmt.Println("Database migrations completed successfully")
+	log.Println("Database migrations completed successfully")
+
+	return nil
 }
 
 func main() {
 	serverConfig := config.DefaultConfig()
 
-	migrateDB(serverConfig)
+	dataSource := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		serverConfig.DB_USER, serverConfig.DB_PASSWORD, serverConfig.DB_HOST, serverConfig.DB_PORT, serverConfig.DB_NAME)
 
-	router := httpServer.NewRouter()
+	db, err := sql.Open("postgres", dataSource)
+	if err != nil {
+		log.Fatalf("Failed to connect to the database: %v", err)
+	}
 
-	fmt.Printf("Starting server on :%s...\n", serverConfig.SERVER_PORT)
+	defer db.Close()
+
+	// Test the connection
+	if err := db.Ping(); err != nil {
+		log.Fatalf("failed to ping DB: %s", err)
+	}
+
+	if err := migrateDB(db); err != nil {
+		log.Fatalf("failed to migrate DB: %s", err)
+	}
+
+	transactionRepository := repository.NewRepository(db)
+	transactionService := service.NewTransactionService(transactionRepository)
+
+	router := httpServer.NewRouter(transactionService)
+
+	log.Printf("Starting server on :%s...\n", serverConfig.SERVER_PORT)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", serverConfig.SERVER_PORT), router); err != nil {
-		fmt.Printf("Server failed to start: %v\n", err)
+		log.Printf("Server failed to start: %v\n", err)
 	}
 }

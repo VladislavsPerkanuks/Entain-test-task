@@ -1,21 +1,21 @@
 package http
 
 import (
-	"net/http"
-
+	"github.com/VladislavsPerkanuks/Entain-test-task/internal/handler"
+	"github.com/VladislavsPerkanuks/Entain-test-task/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 // NewRouter creates and configures the HTTP router
-func NewRouter() chi.Router {
+func NewRouter(transactionService service.TransactionService) chi.Router {
+	handler := handler.NewHandler(transactionService)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome"))
-	})
+	r.Get("/user/{userID}/balance", handler.GetBalance)
 
 	return r
 }
