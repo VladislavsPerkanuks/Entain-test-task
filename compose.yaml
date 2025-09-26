@@ -1,8 +1,8 @@
 services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
+  # app:
+  #   build: .
+  #   ports:
+  #     - "3000:3000"
 
   db:
     image: postgres:18.0-alpine3.22
@@ -10,6 +10,13 @@ services:
     # set shared memory limit when using docker compose
     shm_size: 128mb
     environment:
-      POSTGRES_USER: user
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: tbd
+      POSTGRES_DB: database
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
