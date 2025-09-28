@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +20,17 @@ const (
 	TransactionStateLose TransactionState = "lose"
 )
 
+func ToTransactionState(s string) (TransactionState, error) {
+	switch s {
+	case "win":
+		return TransactionStateWin, nil
+	case "lose":
+		return TransactionStateLose, nil
+	default:
+		return "", fmt.Errorf("invalid transaction state: %s", s)
+	}
+}
+
 type SourceType string
 
 const (
@@ -27,17 +39,30 @@ const (
 	SourceTypePayment SourceType = "payment"
 )
 
+func ToSourceType(s string) (SourceType, error) {
+	switch s {
+	case "game":
+		return SourceTypeGame, nil
+	case "server":
+		return SourceTypeServer, nil
+	case "payment":
+		return SourceTypePayment, nil
+	default:
+		return "", fmt.Errorf("invalid source type: %s", s)
+	}
+}
+
 type Transaction struct {
-	ID         uuid.UUID        `json:"id"`
-	UserID     int              `json:"user_id"`
+	ID         uuid.UUID        `json:"transactionId"`
+	UserID     int              `json:"userId"`
 	State      TransactionState `json:"state"`
 	Amount     decimal.Decimal  `json:"amount"`
-	SourceType SourceType       `json:"source_type"`
-	CreatedAt  time.Time        `json:"created_at"`
+	SourceType SourceType       `json:"sourceType"`
+	CreatedAt  time.Time        `json:"createdAt"`
 }
 
 type ProcessedTransaction struct {
-	TransactionID uuid.UUID `json:"transaction_id"`
-	UserID        int       `json:"user_id"`
-	ProcessedAt   time.Time `json:"processed_at"`
+	TransactionID uuid.UUID `json:"transactionId"`
+	UserID        int       `json:"userId"`
+	ProcessedAt   time.Time `json:"processedAt"`
 }

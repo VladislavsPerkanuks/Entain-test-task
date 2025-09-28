@@ -3,12 +3,14 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/VladislavsPerkanuks/Entain-test-task/internal/model"
 	"github.com/VladislavsPerkanuks/Entain-test-task/internal/service"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -55,40 +57,54 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+type transactionRequestBody struct {
+	State         string `json:"state"`
+	Amount        string `json:"amount"`
+	TransactionID string `json:"transactionId"`
+}
+
+const (
+	SourceTypeHeader string = "Source-Type"
+)
+
 func validateTransactionRequest(r *http.Request) (model.Transaction, error) {
 	userID, err := validateUserID(r)
 	if err != nil {
 		return model.Transaction{}, err
 	}
 
-	transaction := model.Transaction{
-		UserID: userID,
+	var reqBody transactionRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		return model.Transaction{}, errors.New("invalid request body")
 	}
 
-	switch r.Header.Get("Source-Type") {
-	case string(model.SourceTypeGame):
-		transaction.SourceType = model.SourceTypeGame
-	case string(model.SourceTypePayment):
-		transaction.SourceType = model.SourceTypePayment
-	case string(model.SourceTypeServer):
-		transaction.SourceType = model.SourceTypeServer
-	default:
-		return model.Transaction{}, errors.New("invalid source type")
+	amount, err := decimal.NewFromString(reqBody.Amount)
+	if err != nil || amount.LessThanOrEqual(decimal.Zero) {
+		return model.Transaction{}, errors.New("amount must be a positive number")
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&transaction); err != nil {
-		return model.Transaction{}, errors.New("invalid request")
+	state, err := model.ToTransactionState(reqBody.State)
+	if err != nil {
+		return model.Transaction{}, fmt.Errorf("invalid transaction state: %w", err)
 	}
 
-	if transaction.Amount.LessThanOrEqual(decimal.Zero) {
-		return model.Transaction{}, errors.New("amount must be greater than zero")
+	sourceType, err := model.ToSourceType(r.Header.Get(SourceTypeHeader))
+	if err != nil {
+		return model.Transaction{}, fmt.Errorf("invalid source type: %w", err)
 	}
 
-	if transaction.State != model.TransactionStateWin && transaction.State != model.TransactionStateLose {
-		return model.Transaction{}, errors.New("invalid transaction state")
+	transactionID, err := uuid.Parse(reqBody.TransactionID)
+	if err != nil || transactionID == uuid.Nil {
+		return model.Transaction{}, errors.New("invalid transactionId format")
 	}
 
-	return transaction, nil
+	return model.Transaction{
+		ID:         transactionID,
+		UserID:     userID,
+		State:      state,
+		Amount:     amount,
+		SourceType: sourceType,
+	}, nil
 }
 
 func (h *Handler) ProcessTransaction(w http.ResponseWriter, r *http.Request) {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/VladislavsPerkanuks/Entain-test-task/internal/config"
@@ -70,7 +71,9 @@ func main() {
 	router := httpServer.NewRouter(transactionService)
 
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
+	defer signal.Stop(stop)
+
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", serverConfig.SERVER_PORT),
@@ -98,4 +101,5 @@ func main() {
 	}
 
 	log.Println("Server stopped gracefully")
+	os.Exit(0)
 }
