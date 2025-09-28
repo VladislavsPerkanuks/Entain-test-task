@@ -30,9 +30,13 @@ func (m *MockTransactionService) GetBalance(userID int) (decimal.Decimal, error)
 }
 
 func (m *MockTransactionService) ProcessTransaction(tx *model.Transaction) error {
-	m.processed = append(m.processed, tx)
 	args := m.Called(tx)
-	return args.Error(0)
+	err := args.Error(0)
+	if err == nil {
+		m.processed = append(m.processed, tx)
+	}
+
+	return err
 }
 
 func TestValidateUserID(t *testing.T) {

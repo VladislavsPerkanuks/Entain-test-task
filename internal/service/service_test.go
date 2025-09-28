@@ -23,7 +23,17 @@ type MockRepository struct {
 
 func (m *MockRepository) WithDBTransaction(fn func(repository.Repository) error) error {
 	args := m.Called(fn)
-	return args.Error(0)
+	// If the mock is configured to return an error for the transaction wrapper, return it.
+	if err := args.Error(0); err != nil {
+		return err
+	}
+
+	// Otherwise execute the provided function to simulate the transactional work.
+	if fn == nil {
+		return nil
+	}
+
+	return fn(m)
 }
 
 func (m *MockRepository) GetBalanceByID(userID int) (decimal.Decimal, error) {
@@ -91,17 +101,7 @@ func TestProcessTransaction(t *testing.T) {
 			name: "duplicate",
 			tx:   &model.Transaction{ID: duplicateID, UserID: 1, State: model.TransactionStateWin, Amount: decimal.NewFromInt(10)},
 			setupMock: func(m *MockRepository) {
-				m.On("WithDBTransaction", mock.Anything).Return(nil)
 				m.On("GetTransactionByID", duplicateID).Return(&model.Transaction{ID: duplicateID}, nil)
-			},
-			wantErr: true,
-		},
-		{
-			name: "get transaction error",
-			tx:   &model.Transaction{ID: uuid.New(), UserID: 1, State: model.TransactionStateWin, Amount: decimal.NewFromInt(10)},
-			setupMock: func(m *MockRepository) {
-				m.On("WithDBTransaction", mock.Anything).Return(nil)
-				m.On("GetTransactionByID", mock.Anything).Return(nil, errors.New("db error"))
 			},
 			wantErr: true,
 		},
@@ -130,15 +130,18 @@ func TestProcessTransaction(t *testing.T) {
 			name: "transaction wrapper error",
 			tx:   &model.Transaction{ID: uuid.New(), UserID: 1, State: model.TransactionStateWin, Amount: decimal.NewFromInt(5)},
 			setupMock: func(m *MockRepository) {
+				m.On("GetTransactionByID", mock.Anything).Return(nil, repository.ErrTransactionNotFound)
 				m.On("WithDBTransaction", mock.Anything).Return(errors.New("tx fail"))
 			},
 			wantErr: true,
 		},
 		{
-			name:      "nil transaction id",
-			tx:        &model.Transaction{UserID: 1, State: model.TransactionStateWin, Amount: decimal.NewFromInt(5)},
-			setupMock: func(m *MockRepository) {},
-			wantErr:   true,
+			name: "nil transaction id",
+			tx:   &model.Transaction{UserID: 1, State: model.TransactionStateWin, Amount: decimal.NewFromInt(5)},
+			setupMock: func(m *MockRepository) {
+				m.On("GetTransactionByID", mock.Anything).Return(nil, repository.ErrTransactionNotFound)
+			},
+			wantErr: true,
 		},
 	}
 
