@@ -16,6 +16,7 @@ func NewRouter(transactionService service.TransactionService) chi.Router {
 	r.Use(middleware.Logger)
 
 	r.Get("/user/{userID}/balance", handler.GetBalance)
+	r.Post("/user/{userID}/transaction", handler.ProcessTransaction)
 
 	return r
 }
