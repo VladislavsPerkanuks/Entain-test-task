@@ -15,41 +15,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-type userID = int
-
-type mockTransactionService struct {
-	balances   map[userID]decimal.Decimal
-	balanceErr error
-	processErr error
-	processed  []*model.Transaction
+type MockTransactionService struct {
+	mock.Mock
+	processed []*model.Transaction
 }
 
-func newStubTransactionService() *mockTransactionService {
-	return &mockTransactionService{balances: map[int]decimal.Decimal{}}
+func (m *MockTransactionService) GetBalance(userID int) (decimal.Decimal, error) {
+	args := m.Called(userID)
+	return args.Get(0).(decimal.Decimal), args.Error(1)
 }
 
-func (s *mockTransactionService) GetBalance(userID int) (decimal.Decimal, error) {
-	if s.balanceErr != nil {
-		return decimal.Zero, s.balanceErr
-	}
-
-	if balance, ok := s.balances[userID]; ok {
-		return balance, nil
-	}
-
-	return decimal.Zero, errors.New("user not found")
-}
-
-func (s *mockTransactionService) ProcessTransaction(tx *model.Transaction) error {
-	if s.processErr != nil {
-		return s.processErr
-	}
-
-	s.processed = append(s.processed, tx)
-	return nil
+func (m *MockTransactionService) ProcessTransaction(tx *model.Transaction) error {
+	m.processed = append(m.processed, tx)
+	args := m.Called(tx)
+	return args.Error(0)
 }
 
 func TestValidateUserID(t *testing.T) {
@@ -190,19 +173,17 @@ func TestValidateTransactionRequest(t *testing.T) {
 
 func TestHandlerGetBalance(t *testing.T) {
 	tests := []struct {
-		name           string
-		userID         string
-		serviceFactory func() *mockTransactionService
-		wantStatus     int
-		wantBody       map[string]any
+		name       string
+		userID     string
+		setupMock  func(m *MockTransactionService)
+		wantStatus int
+		wantBody   map[string]any
 	}{
 		{
 			name:   "success",
 			userID: "1",
-			serviceFactory: func() *mockTransactionService {
-				svc := newStubTransactionService()
-				svc.balances[1] = decimal.RequireFromString("123.45")
-				return svc
+			setupMock: func(m *MockTransactionService) {
+				m.On("GetBalance", 1).Return(decimal.RequireFromString("123.45"), nil)
 			},
 			wantStatus: http.StatusOK,
 			wantBody: map[string]any{
@@ -211,21 +192,17 @@ func TestHandlerGetBalance(t *testing.T) {
 			},
 		},
 		{
-			name:   "validation error - invalid user ID",
-			userID: "0",
-			serviceFactory: func() *mockTransactionService {
-				return newStubTransactionService()
-			},
+			name:       "validation error - invalid user ID",
+			userID:     "0",
+			setupMock:  func(m *MockTransactionService) {},
 			wantStatus: http.StatusBadRequest,
 			wantBody:   nil,
 		},
 		{
 			name:   "service error - user not found",
 			userID: "1",
-			serviceFactory: func() *mockTransactionService {
-				svc := newStubTransactionService()
-				svc.balanceErr = errors.New("db error")
-				return svc
+			setupMock: func(m *MockTransactionService) {
+				m.On("GetBalance", 1).Return(decimal.Zero, errors.New("db error"))
 			},
 			wantStatus: http.StatusInternalServerError,
 			wantBody:   nil,
@@ -234,7 +211,8 @@ func TestHandlerGetBalance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service := tt.serviceFactory()
+			service := &MockTransactionService{}
+			tt.setupMock(service)
 			h := NewHandler(service)
 
 			req := httptest.NewRequest(http.MethodGet, "/user/"+tt.userID+"/balance", nil)
@@ -253,6 +231,8 @@ func TestHandlerGetBalance(t *testing.T) {
 				assert.Equal(t, tt.wantBody["user_id"], body["user_id"])
 				assert.Equal(t, tt.wantBody["balance"], body["balance"])
 			}
+
+			service.AssertExpectations(t)
 		})
 	}
 }
@@ -261,33 +241,31 @@ func TestHandlerProcessTransaction(t *testing.T) {
 	transactionID := uuid.New().String()
 
 	tests := []struct {
-		name           string
-		requestBody    []byte
-		userID         string
-		sourceType     string
-		serviceFactory func() *mockTransactionService
-		wantStatus     int
-		wantProcessed  bool
+		name          string
+		requestBody   []byte
+		userID        string
+		sourceType    string
+		setupMock     func(m *MockTransactionService)
+		wantStatus    int
+		wantProcessed bool
 	}{
 		{
 			name:        "success",
 			requestBody: []byte(`{"state":"win","amount":"10.00","transactionId":"` + transactionID + `"}`),
 			userID:      "1",
 			sourceType:  string(model.SourceTypeGame),
-			serviceFactory: func() *mockTransactionService {
-				return newStubTransactionService()
+			setupMock: func(m *MockTransactionService) {
+				m.On("ProcessTransaction", mock.AnythingOfType("*model.Transaction")).Return(nil)
 			},
 			wantStatus:    http.StatusOK,
 			wantProcessed: true,
 		},
 		{
-			name:        "bad request - invalid body",
-			requestBody: []byte(`{"state":"win"}`),
-			userID:      "1",
-			sourceType:  string(model.SourceTypeGame),
-			serviceFactory: func() *mockTransactionService {
-				return newStubTransactionService()
-			},
+			name:          "bad request - invalid body",
+			requestBody:   []byte(`{"state":"win"}`),
+			userID:        "1",
+			sourceType:    string(model.SourceTypeGame),
+			setupMock:     func(m *MockTransactionService) {},
 			wantStatus:    http.StatusBadRequest,
 			wantProcessed: false,
 		},
@@ -296,11 +274,8 @@ func TestHandlerProcessTransaction(t *testing.T) {
 			requestBody: []byte(`{"state":"lose","amount":"5.00","transactionId":"` + uuid.New().String() + `"}`),
 			userID:      "1",
 			sourceType:  string(model.SourceTypePayment),
-			serviceFactory: func() *mockTransactionService {
-				svc := newStubTransactionService()
-				svc.processErr = errors.New("insert failed")
-
-				return svc
+			setupMock: func(m *MockTransactionService) {
+				m.On("ProcessTransaction", mock.AnythingOfType("*model.Transaction")).Return(errors.New("insert failed"))
 			},
 			wantStatus:    http.StatusInternalServerError,
 			wantProcessed: false,
@@ -309,7 +284,8 @@ func TestHandlerProcessTransaction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service := tt.serviceFactory()
+			service := &MockTransactionService{}
+			tt.setupMock(service)
 			h := NewHandler(service)
 
 			req := httptest.NewRequest(http.MethodPost, "/user/"+tt.userID+"/transaction", bytes.NewReader(tt.requestBody))
@@ -330,6 +306,8 @@ func TestHandlerProcessTransaction(t *testing.T) {
 			} else {
 				assert.Len(t, service.processed, 0)
 			}
+
+			service.AssertExpectations(t)
 		})
 	}
 }
