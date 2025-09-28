@@ -1,5 +1,7 @@
 package config
 
+import "os"
+
 type Config struct {
 	// DB
 	DB_HOST     string
@@ -12,13 +14,21 @@ type Config struct {
 	SERVER_PORT string
 }
 
+func getEnvOrDefault(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+
+	return defaultValue
+}
+
 func DefaultConfig() *Config {
 	return &Config{
-		DB_HOST:     "localhost",
-		DB_PORT:     "5432",
-		DB_USER:     "postgres",
-		DB_PASSWORD: "password",
-		DB_NAME:     "database",
-		SERVER_PORT: "3000",
+		DB_HOST:     getEnvOrDefault("DB_HOST", "localhost"),
+		DB_PORT:     getEnvOrDefault("DB_PORT", "5432"),
+		DB_USER:     getEnvOrDefault("DB_USER", "postgres"),
+		DB_PASSWORD: getEnvOrDefault("DB_PASSWORD", "password"),
+		DB_NAME:     getEnvOrDefault("DB_NAME", "database"),
+		SERVER_PORT: getEnvOrDefault("SERVER_PORT", "3000"),
 	}
 }
