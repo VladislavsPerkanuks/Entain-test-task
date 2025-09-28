@@ -17,13 +17,6 @@ CREATE TABLE transactions (
     ),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
-CREATE TABLE processed_transactions (
-    transaction_id UUID PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users (id),
-    processed_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 INSERT INTO users (balance) VALUES
 (100.00),
 (200.00),
