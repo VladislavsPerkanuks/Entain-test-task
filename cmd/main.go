@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/VladislavsPerkanuks/Entain-test-task/internal/config"
 	httpServer "github.com/VladislavsPerkanuks/Entain-test-task/internal/http"
@@ -51,8 +55,6 @@ func main() {
 		log.Fatalf("Failed to connect to the database: %v", err)
 	}
 
-	defer db.Close()
-
 	// Test the connection
 	if err := db.Ping(); err != nil {
 		log.Fatalf("failed to ping DB: %s", err)
@@ -67,8 +69,33 @@ func main() {
 
 	router := httpServer.NewRouter(transactionService)
 
-	log.Printf("Starting server on :%s...\n", serverConfig.SERVER_PORT)
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", serverConfig.SERVER_PORT), router); err != nil {
-		log.Printf("Server failed to start: %v\n", err)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%s", serverConfig.SERVER_PORT),
+		Handler: router,
 	}
+
+	go func() {
+		log.Printf("Starting server on :%s...\n", serverConfig.SERVER_PORT)
+		if err := server.ListenAndServe(); err != nil {
+			if err != http.ErrServerClosed {
+				log.Fatalf("ListenAndServe error: %v", err)
+			}
+		}
+	}()
+
+	// Wait for a signal
+	<-stop
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server stopped gracefully")
 }
