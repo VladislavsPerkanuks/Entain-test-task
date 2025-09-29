@@ -1,0 +1,52 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  e2e-tests:
+    name: E2E API Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.1"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build Docker image
+        run: docker compose build
+
+      - name: Start services
+        run: docker-compose up -d
+
+      - name: Wait for service to be healthy
+        run: curl --fail-with-body --retry 10 --retry-delay 5 --retry-connrefused http://localhost:3000/user/1/balance
+
+      - name: Run E2E API tests
+        run: go test ./tests/api -v
+
+      - name: Run Performance Tests
+        run: RUN_PERFORMANCE_TESTS=1 go test ./tests/api -run TestPerformance -v
+
+      - name: Stop services
+        if: always() # Run even if tests fail
+        run: docker-compose down
