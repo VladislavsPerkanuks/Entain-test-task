@@ -21,7 +21,7 @@ A Go-based transaction processing service that handles user balance management w
 docker compose build
 
 # Start the application and database
-docker-compose up -d
+docker compose up -d
 
 # The service will be available at http://localhost:3000
 ```
@@ -62,7 +62,7 @@ The API tests require a running PostgreSQL instance.
 
 ```bash
 # Start dependencies
-docker-compose up -d
+docker compose up -d
 
 # Run API tests
 go test ./tests/api -v
