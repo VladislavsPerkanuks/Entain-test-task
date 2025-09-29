@@ -191,7 +191,7 @@ func TestHandlerGetBalance(t *testing.T) {
 			},
 			wantStatus: http.StatusOK,
 			wantBody: map[string]any{
-				"user_id": float64(1),
+				"userId": float64(1),
 				"balance": "123.45",
 			},
 		},
@@ -232,7 +232,7 @@ func TestHandlerGetBalance(t *testing.T) {
 				assert.Equal(t, "application/json", resp.Header().Get("Content-Type"))
 				var body map[string]any
 				require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &body))
-				assert.Equal(t, tt.wantBody["user_id"], body["user_id"])
+				assert.Equal(t, tt.wantBody["userId"], body["userId"])
 				assert.Equal(t, tt.wantBody["balance"], body["balance"])
 			}
 

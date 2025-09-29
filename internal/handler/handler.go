@@ -50,8 +50,8 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	response := map[string]any{
-		"user_id": userID,
-		"balance": balance,
+		"userId": userID,
+		"balance": balance.StringFixed(2),
 	}
 
 	json.NewEncoder(w).Encode(response)
