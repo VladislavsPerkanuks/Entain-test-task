@@ -13,6 +13,8 @@ FROM alpine:latest
 
 WORKDIR /app
 
+RUN apk add --no-cache wget
+
 COPY --from=builder /app/main .
 COPY migrations ./migrations
 
