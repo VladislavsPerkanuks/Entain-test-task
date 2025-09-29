@@ -38,6 +38,10 @@ jobs:
       - name: Start services and wait for them to be healthy
         run: docker compose up --wait
 
+      - name: Show app logs if unhealthy
+        if: failure() # Run only if the previous step failed
+        run: docker compose logs app
+
       - name: Run E2E API tests
         run: go test ./tests/api -v
 
