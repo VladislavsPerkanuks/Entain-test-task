@@ -17,8 +17,8 @@ func NewRouter(transactionService service.TransactionService) chi.Router {
 
 	r.Use(middleware.Logger)
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
+	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	})
 
