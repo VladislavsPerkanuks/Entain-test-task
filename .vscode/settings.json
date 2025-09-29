@@ -11,4 +11,7 @@
     "fmt",
     "--stdin"
   ],
+  "go.testEnvVars": {
+    // "RUN_PERFORMANCE_TESTS": "1"
+  }
 }

@@ -20,4 +20,5 @@ CREATE TABLE transactions (
 INSERT INTO users (balance) VALUES
 (100.00),
 (200.00),
-(50.00);
+(50.00),
+(33.33);
