@@ -114,9 +114,9 @@ WHERE id = $1`, txID).Scan(&tx.ID, &tx.UserID, &tx.State, &tx.Amount, &tx.Source
 func (r *Postgresql) InsertTransaction(ctx context.Context, tx *model.Transaction) error {
 	if _, err := r.exec(ctx, `
 INSERT INTO transactions
-(id, user_id, state, amount, source_type, created_at)
-VALUES ($1, $2, $3, $4, $5, $6)`,
-		tx.ID, tx.UserID, tx.State, tx.Amount, tx.SourceType, tx.CreatedAt); err != nil {
+(id, user_id, state, amount, source_type)
+VALUES ($1, $2, $3, $4, $5)`,
+		tx.ID, tx.UserID, tx.State, tx.Amount, tx.SourceType); err != nil {
 		return fmt.Errorf("failed to insert transaction: %w", err)
 	}
 
