@@ -40,7 +40,9 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	balance, err := h.ts.GetBalance(userID)
+	ctx := r.Context()
+
+	balance, err := h.ts.GetBalance(ctx, userID)
 	if err != nil {
 		http.Error(w, "Failed to get balance", http.StatusInternalServerError)
 
@@ -50,11 +52,13 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	response := map[string]any{
-		"userId": userID,
+		"userId":  userID,
 		"balance": balance.StringFixed(2),
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err = json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 type transactionRequestBody struct {
@@ -74,7 +78,7 @@ func validateTransactionRequest(r *http.Request) (model.Transaction, error) {
 	}
 
 	var reqBody transactionRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		return model.Transaction{}, errors.New("invalid request body")
 	}
 
@@ -113,8 +117,9 @@ func (h *Handler) ProcessTransaction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	ctx := r.Context()
 
-	if err := h.ts.ProcessTransaction(&validatedReq); err != nil {
+	if err = h.ts.ProcessTransaction(ctx, &validatedReq); err != nil {
 		http.Error(w, "Failed to process transaction", http.StatusInternalServerError)
 
 		return

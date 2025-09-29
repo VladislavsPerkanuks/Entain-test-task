@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -20,9 +21,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// APITestSuite provides test setup and teardown for All API integration tests
+// APITestSuite provides test setup and teardown for All API integration tests.
 type APITestSuite struct {
 	suite.Suite
+
 	httpClient *http.Client
 	testDB     *sql.DB
 	BaseURL    string
@@ -49,7 +51,7 @@ type BalanceResponse struct {
 	Balance string `json:"balance"`
 }
 
-// SetupSuite runs once before all tests in the suite
+// SetupSuite runs once before all tests in the suite.
 func (s *APITestSuite) SetupSuite() {
 	s.testConfig = config.DefaultConfig()
 	s.BaseURL = "http://localhost:3000"
@@ -65,14 +67,21 @@ func (s *APITestSuite) SetupSuite() {
 
 	s.Require().NoError(s.waitForServer(s.BaseURL, 30*time.Second), "server not ready")
 
-	connectionString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", s.testConfig.DB_USER, s.testConfig.DB_PASSWORD, s.testConfig.DB_HOST, s.testConfig.DB_PORT, s.testConfig.DB_NAME)
+	hostPort := net.JoinHostPort(s.testConfig.DatabaseHost, s.testConfig.DatabasePort)
+	connectionString := fmt.Sprintf(
+		"postgres://%s:%s@%s/%s?sslmode=disable",
+		s.testConfig.DatabaseUser,
+		s.testConfig.DatabasePassword,
+		hostPort,
+		s.testConfig.DatabaseName,
+	)
 
 	conn, err := sql.Open("postgres", connectionString)
 	s.Require().NoError(err, "failed to open test database connection")
 	s.testDB = conn
 }
 
-// SetupTest runs before each individual test
+// SetupTest runs before each individual test.
 func (s *APITestSuite) SetupTest() {
 	s.resetDatabaseState(context.Background())
 }
@@ -106,7 +115,12 @@ func (s *APITestSuite) GetBalance(tb testing.TB, userID int) apiResponse {
 }
 
 // ProcessTransaction performs a POST /user/{id}/transaction request with the provided payload and source type.
-func (s *APITestSuite) ProcessTransaction(tb testing.TB, userID int, sourceType string, body TransactionRequest) apiResponse {
+func (s *APITestSuite) ProcessTransaction(
+	tb testing.TB,
+	userID int,
+	sourceType string,
+	body TransactionRequest,
+) apiResponse {
 	tb.Helper()
 
 	url := fmt.Sprintf("%s/user/%d/transaction", strings.TrimRight(s.BaseURL, "/"), userID)
@@ -156,7 +170,7 @@ func (s *APITestSuite) resetDatabaseState(ctx context.Context) {
 	}()
 
 	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+		if _, err = tx.ExecContext(ctx, stmt); err != nil {
 			s.Require().NoError(err, "failed to execute statement")
 		}
 	}
@@ -173,7 +187,12 @@ func (s *APITestSuite) waitForServer(baseURL string, timeout time.Duration) erro
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/user/1/balance", strings.TrimRight(baseURL, "/")), nil)
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodGet,
+			fmt.Sprintf("%s/user/1/balance", strings.TrimRight(baseURL, "/")),
+			nil,
+		)
 		if err != nil {
 			cancel()
 			return fmt.Errorf("create readiness request: %w", err)

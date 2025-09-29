@@ -1,9 +1,10 @@
 {
   "go.lintTool": "golangci-lint",
   "go.lintFlags": [
-    "--fast-only"
+    "--path-mode=abs",
   ],
-  "go.formatTool": "default",
+  "go.lintOnSave": "package",
+  "go.formatTool": "custom",
   "go.alternateTools": {
     "customFormatter": "golangci-lint"
   },

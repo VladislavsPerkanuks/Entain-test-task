@@ -8,7 +8,7 @@ type TransactionTestSuite struct {
 	APITestSuite
 }
 
-// TestProcessTransactionWin tests win transactions that increase user balance
+// TestProcessTransactionWin tests win transactions that increase user balance.
 func (s *TransactionTestSuite) TestProcessTransactionWinGame() {
 	transactionReq := TransactionRequest{
 		State:         "win",
@@ -59,7 +59,7 @@ func (s *TransactionTestSuite) TestProcessTransactionWinPayment() {
 	s.JSONEq(expected, string(balanceResp.Body), "Balance should be increased by win amount")
 }
 
-// Test lose transaction that decreases user balance
+// Test lose transaction that decreases user balance.
 func (s *TransactionTestSuite) TestProcessTransactionLose() {
 	transactionReq := TransactionRequest{
 		State:         "lose",
@@ -76,7 +76,7 @@ func (s *TransactionTestSuite) TestProcessTransactionLose() {
 	s.JSONEq(expected, string(balanceResp.Body), "Balance should be decreased by lose amount")
 }
 
-// Test lose transaction that would result in negative balance
+// Test lose transaction that would result in negative balance.
 func (s *TransactionTestSuite) TestProcessTransactionLoseInsufficientBalance() {
 	transactionReq := TransactionRequest{
 		State:         "lose",

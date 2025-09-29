@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -11,8 +12,8 @@ import (
 )
 
 type TransactionService interface {
-	GetBalance(userID int) (decimal.Decimal, error)
-	ProcessTransaction(tx *model.Transaction) error
+	GetBalance(ctx context.Context, userID int) (decimal.Decimal, error)
+	ProcessTransaction(ctx context.Context, tx *model.Transaction) error
 }
 
 type TransactionServiceImpl struct {
@@ -23,12 +24,12 @@ func NewTransactionService(repo repository.Repository) TransactionService {
 	return &TransactionServiceImpl{repo: repo}
 }
 
-func (s *TransactionServiceImpl) GetBalance(userID int) (decimal.Decimal, error) {
-	return s.repo.GetBalanceByID(userID)
+func (s *TransactionServiceImpl) GetBalance(ctx context.Context, userID int) (decimal.Decimal, error) {
+	return s.repo.GetBalanceByID(ctx, userID)
 }
 
-func (s *TransactionServiceImpl) ProcessTransaction(tx *model.Transaction) error {
-	_, err := s.repo.GetTransactionByID(tx.ID)
+func (s *TransactionServiceImpl) ProcessTransaction(ctx context.Context, tx *model.Transaction) error {
+	_, err := s.repo.GetTransactionByID(ctx, tx.ID)
 	if !errors.Is(err, repository.ErrTransactionNotFound) {
 		return fmt.Errorf("transaction with ID %s already exists or failed to check existence: %w", tx.ID, err)
 	}
@@ -45,15 +46,15 @@ func (s *TransactionServiceImpl) ProcessTransaction(tx *model.Transaction) error
 	}
 
 	if tx.ID == uuid.Nil {
-		return fmt.Errorf("transaction ID cannot be nil")
+		return errors.New("transaction ID cannot be nil")
 	}
 
-	return s.repo.WithDBTransaction(func(tr repository.Repository) error {
-		if err := tr.InsertTransaction(tx); err != nil {
+	return s.repo.WithDBTransaction(ctx, func(ctx context.Context, tr repository.Repository) error {
+		if err = tr.InsertTransaction(ctx, tx); err != nil {
 			return fmt.Errorf("failed to insert transaction: %w", err)
 		}
 
-		if err := tr.UpdateUserBalance(tx.UserID, balanceDelta); err != nil {
+		if err = tr.UpdateUserBalance(ctx, tx.UserID, balanceDelta); err != nil {
 			return fmt.Errorf("failed to update user balance: %w", err)
 		}
 

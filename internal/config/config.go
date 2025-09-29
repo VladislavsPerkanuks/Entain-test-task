@@ -4,14 +4,14 @@ import "os"
 
 type Config struct {
 	// DB
-	DB_HOST     string
-	DB_PORT     string
-	DB_USER     string
-	DB_PASSWORD string
-	DB_NAME     string
+	DatabaseHost     string
+	DatabasePort     string
+	DatabaseUser     string
+	DatabasePassword string
+	DatabaseName     string
 
 	// Server
-	SERVER_PORT string
+	ServerPort string
 }
 
 func getEnvOrDefault(key, defaultValue string) string {
@@ -24,11 +24,11 @@ func getEnvOrDefault(key, defaultValue string) string {
 
 func DefaultConfig() *Config {
 	return &Config{
-		DB_HOST:     getEnvOrDefault("DB_HOST", "localhost"),
-		DB_PORT:     getEnvOrDefault("DB_PORT", "5432"),
-		DB_USER:     getEnvOrDefault("DB_USER", "postgres"),
-		DB_PASSWORD: getEnvOrDefault("DB_PASSWORD", "password"),
-		DB_NAME:     getEnvOrDefault("DB_NAME", "database"),
-		SERVER_PORT: getEnvOrDefault("SERVER_PORT", "3000"),
+		DatabaseHost:     getEnvOrDefault("DB_HOST", "localhost"),
+		DatabasePort:     getEnvOrDefault("DB_PORT", "5432"),
+		DatabaseUser:     getEnvOrDefault("DB_USER", "postgres"),
+		DatabasePassword: getEnvOrDefault("DB_PASSWORD", "password"),
+		DatabaseName:     getEnvOrDefault("DB_NAME", "database"),
+		ServerPort:       getEnvOrDefault("SERVER_PORT", "3000"),
 	}
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,7 +31,7 @@ type LoadTestResult struct {
 	ResponseTimes   []time.Duration
 }
 
-// TestLoadPerformance50RPS tests if the app can handle 50 requests per second
+// TestLoadPerformance50RPS tests if the app can handle 50 requests per second.
 func (s *PerformanceTestSuite) TestLoadPerformance50RPS() {
 	s.T().Log("Starting load test: 50 requests per second for 10 seconds")
 
@@ -45,7 +46,7 @@ func (s *PerformanceTestSuite) TestLoadPerformance50RPS() {
 }
 
 func (s *PerformanceTestSuite) executeLoadTest(config LoadTestConfig) LoadTestResult {
-	totalRequests := int(config.TargetRPS * int(config.Duration.Seconds()))
+	totalRequests := config.TargetRPS * int(config.Duration.Seconds())
 
 	// Results tracking
 	var successCount, errorCount int32
@@ -65,7 +66,14 @@ func (s *PerformanceTestSuite) executeLoadTest(config LoadTestConfig) LoadTestRe
 		select {
 		case <-ticker.C:
 			wg.Add(1)
-			go s.executeRequest(&wg, i, &successCount, &errorCount, &responseTimes, &mu)
+			go s.executeRequest( //nolint:testifylint // false positive
+				&wg,
+				i,
+				&successCount,
+				&errorCount,
+				&responseTimes,
+				&mu,
+			)
 		case <-time.After(config.Duration + time.Second):
 			s.T().Log("Load test timeout reached")
 			goto waitForCompletion
@@ -134,7 +142,7 @@ func (s *PerformanceTestSuite) performRequestOperation(requestNum int) bool {
 func (s *PerformanceTestSuite) performBalanceCheck(userID int) bool {
 	resp := s.GetBalance(s.T(), userID)
 
-	return resp.StatusCode == 200
+	return resp.StatusCode == http.StatusOK
 }
 
 func (s *PerformanceTestSuite) performTransaction(userID, requestNum int) bool {
@@ -157,7 +165,7 @@ func (s *PerformanceTestSuite) performTransaction(userID, requestNum int) bool {
 
 	resp := s.ProcessTransaction(s.T(), userID, sourceType, transactionReq)
 
-	return resp.StatusCode == 200
+	return resp.StatusCode == http.StatusOK
 }
 
 func (s *PerformanceTestSuite) waitForRequestsCompletion(wg *sync.WaitGroup) {
@@ -225,26 +233,30 @@ func (s *PerformanceTestSuite) logTestResults(config LoadTestConfig, result Load
 
 func (s *PerformanceTestSuite) assertPerformanceRequirements(config LoadTestConfig, result LoadTestResult) {
 	minAcceptableRPS := float64(config.TargetRPS) * 0.8
-	s.True(
-		result.ActualRPS >= minAcceptableRPS,
+	s.GreaterOrEqual(
+		result.ActualRPS,
+		minAcceptableRPS,
 		"Should achieve at least 80%% of target RPS (%.2f >= %.2f)",
 		result.ActualRPS, minAcceptableRPS,
 	)
 
-	s.True(
-		result.SuccessRate >= 95.0,
+	s.GreaterOrEqual(
+		result.SuccessRate,
+		95.0,
 		"Should have at least 95%% success rate (%.2f%% >= 95%%)",
 		result.SuccessRate,
 	)
 
-	s.True(
-		result.AvgResponseTime < 1*time.Second,
+	s.Less(
+		result.AvgResponseTime,
+		1*time.Second,
 		"Average response time should be under 1 second (%v < 1s)",
 		result.AvgResponseTime,
 	)
 
-	s.True(
-		result.MaxResponseTime < 5*time.Second,
+	s.Less(
+		result.MaxResponseTime,
+		5*time.Second,
 		"Max response time should be under 5 seconds (%v < 5s)",
 		result.MaxResponseTime,
 	)

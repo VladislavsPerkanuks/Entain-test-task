@@ -21,15 +21,16 @@ import (
 
 type MockTransactionService struct {
 	mock.Mock
+
 	processed []*model.Transaction
 }
 
-func (m *MockTransactionService) GetBalance(userID int) (decimal.Decimal, error) {
+func (m *MockTransactionService) GetBalance(_ context.Context, userID int) (decimal.Decimal, error) {
 	args := m.Called(userID)
 	return args.Get(0).(decimal.Decimal), args.Error(1)
 }
 
-func (m *MockTransactionService) ProcessTransaction(tx *model.Transaction) error {
+func (m *MockTransactionService) ProcessTransaction(_ context.Context, tx *model.Transaction) error {
 	args := m.Called(tx)
 	err := args.Error(0)
 	if err == nil {
@@ -54,7 +55,7 @@ func TestValidateUserID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/dummy", nil)
+			req := httptest.NewRequest(http.MethodGet, "/dummy", nil)
 			ctx := chi.NewRouteContext()
 			ctx.URLParams.Add("userID", tt.param)
 			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, ctx))
@@ -149,7 +150,7 @@ func TestValidateTransactionRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", "/dummy", bytes.NewBufferString(tt.body))
+			req := httptest.NewRequest(http.MethodPost, "/dummy", bytes.NewBufferString(tt.body))
 			if tt.sourceHeader != "" {
 				req.Header.Set(SourceTypeHeader, tt.sourceHeader)
 			}
@@ -191,14 +192,14 @@ func TestHandlerGetBalance(t *testing.T) {
 			},
 			wantStatus: http.StatusOK,
 			wantBody: map[string]any{
-				"userId": float64(1),
+				"userId":  float64(1),
 				"balance": "123.45",
 			},
 		},
 		{
 			name:       "validation error - invalid user ID",
 			userID:     "0",
-			setupMock:  func(m *MockTransactionService) {},
+			setupMock:  func(_ *MockTransactionService) {},
 			wantStatus: http.StatusBadRequest,
 			wantBody:   nil,
 		},
@@ -217,6 +218,7 @@ func TestHandlerGetBalance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			service := &MockTransactionService{}
 			tt.setupMock(service)
+
 			h := NewHandler(service)
 
 			req := httptest.NewRequest(http.MethodGet, "/user/"+tt.userID+"/balance", nil)
@@ -269,7 +271,7 @@ func TestHandlerProcessTransaction(t *testing.T) {
 			requestBody:   []byte(`{"state":"win"}`),
 			userID:        "1",
 			sourceType:    string(model.SourceTypeGame),
-			setupMock:     func(m *MockTransactionService) {},
+			setupMock:     func(_ *MockTransactionService) {},
 			wantStatus:    http.StatusBadRequest,
 			wantProcessed: false,
 		},
@@ -279,7 +281,8 @@ func TestHandlerProcessTransaction(t *testing.T) {
 			userID:      "1",
 			sourceType:  string(model.SourceTypePayment),
 			setupMock: func(m *MockTransactionService) {
-				m.On("ProcessTransaction", mock.AnythingOfType("*model.Transaction")).Return(errors.New("insert failed"))
+				m.On("ProcessTransaction", mock.AnythingOfType("*model.Transaction")).
+					Return(errors.New("insert failed"))
 			},
 			wantStatus:    http.StatusInternalServerError,
 			wantProcessed: false,
@@ -292,7 +295,11 @@ func TestHandlerProcessTransaction(t *testing.T) {
 			tt.setupMock(service)
 			h := NewHandler(service)
 
-			req := httptest.NewRequest(http.MethodPost, "/user/"+tt.userID+"/transaction", bytes.NewReader(tt.requestBody))
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/user/"+tt.userID+"/transaction",
+				bytes.NewReader(tt.requestBody),
+			)
 			req.Header.Set(SourceTypeHeader, tt.sourceType)
 			req.Header.Set("Content-Type", "application/json")
 
@@ -308,7 +315,7 @@ func TestHandlerProcessTransaction(t *testing.T) {
 				require.Len(t, service.processed, 1)
 				assert.Equal(t, 1, service.processed[0].UserID)
 			} else {
-				assert.Len(t, service.processed, 0)
+				assert.Empty(t, service.processed)
 			}
 
 			service.AssertExpectations(t)

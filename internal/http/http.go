@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-// NewRouter creates and configures the HTTP router
+// NewRouter creates and configures the HTTP router.
 func NewRouter(transactionService service.TransactionService) chi.Router {
 	handler := handler.NewHandler(transactionService)
 

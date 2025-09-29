@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -14,37 +15,37 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 
 type Repository interface {
 	// WithDBTransaction wraps the repository operations in a transaction
-	WithDBTransaction(fn func(Repository) error) error
+	WithDBTransaction(ctx context.Context, fn func(context.Context, Repository) error) error
 
 	// Balance Repository
-	GetBalanceByID(userID int) (decimal.Decimal, error)
-	UpdateUserBalance(userID int, delta decimal.Decimal) error
+	GetBalanceByID(ctx context.Context, userID int) (decimal.Decimal, error)
+	UpdateUserBalance(ctx context.Context, userID int, delta decimal.Decimal) error
 
 	// Transaction Repository
-	GetTransactionByID(txID uuid.UUID) (*model.Transaction, error)
-	InsertTransaction(tx *model.Transaction) error
+	GetTransactionByID(ctx context.Context, txID uuid.UUID) (*model.Transaction, error)
+	InsertTransaction(ctx context.Context, tx *model.Transaction) error
 }
 
-type RepositoryImpl struct {
+type Postgresql struct {
 	db *sql.DB
 	tx *sql.Tx
 }
 
 func NewRepository(db *sql.DB) Repository {
-	return &RepositoryImpl{db: db}
+	return &Postgresql{db: db}
 }
 
-func (r *RepositoryImpl) WithDBTransaction(fn func(Repository) error) error {
+func (r *Postgresql) WithDBTransaction(ctx context.Context, fn func(context.Context, Repository) error) error {
 	if r.tx != nil { // avoid nested transactions
-		return fn(r)
+		return fn(ctx, r)
 	}
 
-	sqlTx, beginErr := r.db.Begin()
+	sqlTx, beginErr := r.db.BeginTx(ctx, nil)
 	if beginErr != nil {
 		return fmt.Errorf("failed to begin transaction: %w", beginErr)
 	}
 
-	txRepo := &RepositoryImpl{db: r.db, tx: sqlTx}
+	txRepo := &Postgresql{db: r.db, tx: sqlTx}
 	var fnErr error
 
 	defer func() {
@@ -64,15 +65,15 @@ func (r *RepositoryImpl) WithDBTransaction(fn func(Repository) error) error {
 		}
 	}()
 
-	fnErr = fn(txRepo)
+	fnErr = fn(ctx, txRepo)
 
 	return fnErr
 }
 
-func (r *RepositoryImpl) GetBalanceByID(userID int) (decimal.Decimal, error) {
+func (r *Postgresql) GetBalanceByID(ctx context.Context, userID int) (decimal.Decimal, error) {
 	var balance decimal.Decimal
 
-	err := r.queryRow("SELECT balance FROM users WHERE id = $1", userID).Scan(&balance)
+	err := r.queryRowContext(ctx, "SELECT balance FROM users WHERE id = $1", userID).Scan(&balance)
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("failed to get balance for user %d: %w", userID, err)
 	}
@@ -80,8 +81,8 @@ func (r *RepositoryImpl) GetBalanceByID(userID int) (decimal.Decimal, error) {
 	return balance, nil
 }
 
-func (r *RepositoryImpl) UpdateUserBalance(userID int, delta decimal.Decimal) error {
-	if _, err := r.exec(`
+func (r *Postgresql) UpdateUserBalance(ctx context.Context, userID int, delta decimal.Decimal) error {
+	if _, err := r.exec(ctx, `
 UPDATE users
 SET balance = balance + $1
 WHERE id = $2`, delta, userID); err != nil {
@@ -91,10 +92,11 @@ WHERE id = $2`, delta, userID); err != nil {
 	return nil
 }
 
-func (r *RepositoryImpl) GetTransactionByID(txID uuid.UUID) (*model.Transaction, error) {
+func (r *Postgresql) GetTransactionByID(ctx context.Context, txID uuid.UUID) (*model.Transaction, error) {
 	var tx model.Transaction
 
-	err := r.queryRow(`
+	err := r.queryRowContext(ctx,
+		`
 SELECT id, user_id, state, amount, source_type, created_at
 FROM transactions
 WHERE id = $1`, txID).Scan(&tx.ID, &tx.UserID, &tx.State, &tx.Amount, &tx.SourceType, &tx.CreatedAt)
@@ -109,8 +111,8 @@ WHERE id = $1`, txID).Scan(&tx.ID, &tx.UserID, &tx.State, &tx.Amount, &tx.Source
 	return &tx, nil
 }
 
-func (r *RepositoryImpl) InsertTransaction(tx *model.Transaction) error {
-	if _, err := r.exec(`
+func (r *Postgresql) InsertTransaction(ctx context.Context, tx *model.Transaction) error {
+	if _, err := r.exec(ctx, `
 INSERT INTO transactions
 (id, user_id, state, amount, source_type, created_at)
 VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -121,18 +123,18 @@ VALUES ($1, $2, $3, $4, $5, $6)`,
 	return nil
 }
 
-func (r *RepositoryImpl) exec(query string, args ...any) (sql.Result, error) {
+func (r *Postgresql) exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	if r.tx != nil {
-		return r.tx.Exec(query, args...)
+		return r.tx.ExecContext(ctx, query, args...)
 	}
 
-	return r.db.Exec(query, args...)
+	return r.db.ExecContext(ctx, query, args...)
 }
 
-func (r *RepositoryImpl) queryRow(query string, args ...any) *sql.Row {
+func (r *Postgresql) queryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	if r.tx != nil {
-		return r.tx.QueryRow(query, args...)
+		return r.tx.QueryRowContext(ctx, query, args...)
 	}
 
-	return r.db.QueryRow(query, args...)
+	return r.db.QueryRowContext(ctx, query, args...)
 }
